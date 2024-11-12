@@ -4,4 +4,4 @@ CC=gcc
 
 all: ejdb.so
 ejdb.so: ejdb.c 
-	gcc -o ejdb.so ejdb.c -I$(INC_DIR) -llua5.3 -Wall -shared -fPIC
+	gcc -D MYCFLAGS="-D LUA_USE_APICHECK"  -I /usr/include/iowow -o ejdb.so ejdb.c -I$(INC_DIR) -llua5.3 -Wall -shared -fPIC
