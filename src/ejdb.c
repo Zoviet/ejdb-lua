@@ -2,16 +2,17 @@
 // @module ejdb
 
 #include <ejdb2/ejdb2.h>
-#include <ejdb2/jbl.h>
 #include <ejdb2/jql.h>
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define EJDB_DATABASE_META "EJDB*"
 #define EJDB_QUERY_META "JQL*"
 
-#ifdef LUA_VERSION_NUM == 501
+#if LUA_VERSION_NUM == 501
 #define lua_isinteger(L, idx) false
 #endif
 
@@ -32,6 +33,10 @@
       return luaL_error(L, "ejdb: %s", iwlog_ecode_explained(erc));                                                    \
     }                                                                                                                  \
   }
+
+#define IGN$(Val) (__extension__({  \
+    __auto_type IGN$ = _Generic((typeof(Val)*)0, \
+            void*: ((void)(Val),0), default: Val); (void)IGN$; }))
 
 int ejdb_lua_ejdb_gc(lua_State* L) {
   EJDB* db = luaL_checkudata(L, 1, EJDB_DATABASE_META);
@@ -57,7 +62,7 @@ iwrc ejdb_lua_jbl_from_lua_set_field(lua_State* L, int index, const char* key, J
   } else if (lua_isboolean(L, index)) {
     jbl_set_bool(*output, key, lua_toboolean(L, index));
   } else if (lua_isinteger(L, index)) {
-    jbl_set_i64(*output, key, lua_tointeger(L, index));
+    jbl_set_int64(*output, key, lua_tointeger(L, index));
   } else if (lua_isnumber(L, index)) {
     jbl_set_f64(*output, key, lua_tonumber(L, index));
   } else if (lua_isstring(L, index)) {
@@ -97,6 +102,7 @@ iwrc ejdb_lua_jbl_from_lua(lua_State* L, int index, JBL* output) {
     luaL_error(L, "invalid type to serialize: %s", lua_typename(L, lua_type(L, index)));
     return 0;
   }
+  return 0;
 }
 
 iwrc ejdb_lua_jbl_create(lua_State* L, int index, JBL* output) {
@@ -445,7 +451,7 @@ int ejdb_lua_ejdb_remove_index(lua_State* L) {
     } else if (mode[0] == 'f') {
       m |= EJDB_IDX_F64;
     } else {
-      return luaL_error("Invalid modechar %d", mode[0]);
+      return luaL_error(L,"Invalid modechar %d", mode[0]);
     }
     mode++;
   }
@@ -476,7 +482,7 @@ int ejdb_lua_ejdb_get_meta(lua_State* L) {
 // @tparam string placeholder The placeholder to set
 // @tparam integer index Index of something (?)
 // @param value The value to set this placeholder to
-int ejdb_lua_query_set(lua_State* L) {
+int ejdb_lua_query_set(lua_State* L) {  
   lua_settop(L, 4);
   JQL* q = luaL_checkudata(L, 1, EJDB_QUERY_META);
   const char* placeholder = luaL_checkstring(L, 2);
@@ -495,14 +501,14 @@ int ejdb_lua_query_set(lua_State* L) {
     return 0;
   } else if (lua_isstring(L, 4)) {
     const char* value = luaL_checkstring(L, 4);
-    const char* data = malloc(strlen(value) + 1);
+    char* data = malloc(strlen(value) + 1);
     memcpy(data, value, strlen(value) + 1);
     EJDB_LUA_ERROR(jql_set_str2(*q, placeholder, index, data, jql_set_str2_stdfree, NULL));
     return 0;
   } else if (lua_istable(L, 4)) {
     JBL j;
     ejdb_lua_jbl_from_lua(L, 4, &j);
-    jql_set_json_jbl(*q, placeholder, index, j);
+    IGN$(jql_set_json_jbl(*q, placeholder, index, j));
     jbl_destroy(&j);
   } else {
     return luaL_error(L, "invalid type for query:set: %s", lua_typename(L, lua_type(L, 4)));
@@ -521,7 +527,7 @@ int ejdb_lua_query_set_regex(lua_State* L) {
   const char* placeholder = luaL_checkstring(L, 2);
   int index = luaL_checkinteger(L, 3);
   const char* value = luaL_checkstring(L, 4);
-  const char* data = malloc(strlen(value) + 1);
+  char* data = malloc(strlen(value) + 1);
   memcpy(data, value, strlen(value) + 1);
   EJDB_LUA_ERROR(jql_set_regexp2(*q, placeholder, index, data, jql_set_str2_stdfree, NULL));
   return 0;
